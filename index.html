@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Analytics - GCU</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.2.2/build/index.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Times New Roman Standard */
+        * { font-family: "Times New Roman", Times, serif !important; box-sizing: border-box; }
+        body { background-color: #f1f5f9; margin: 0; padding: 0; }
+        
+        .report-section { page-break-inside: avoid !important; margin-bottom: 2rem; width: 100%; }
+        .chart-container { position: relative; width: 100%; margin-top: 1rem; display: flex; justify-content: center; align-items: center; background: #fff; padding: 10px; border: 1px solid #e2e8f0; }
+
+        /* Designed Tables */
+        .academic-table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0;
+            margin-bottom: 15px; 
+            border: 2px solid #1e3a8a; 
+            table-layout: fixed; 
+        }
+        .academic-table th { 
+            background-color: #1e3a8a !important; 
+            color: white !important; 
+            text-transform: uppercase; 
+            font-size: 13px; 
+            padding: 10px 5px; 
+            border: 1px solid #000;
+            -webkit-print-color-adjust: exact; 
+        }
+        .academic-table td { 
+            border: 1px solid #000; 
+            padding: 8px; 
+            font-size: 14px; 
+            color: black; 
+            vertical-align: middle; 
+            word-wrap: break-word;
+        }
+        
+        /* Stripes matching header row */
+        .academic-table tbody tr:nth-child(even) { background-color: #f0f7ff !important; -webkit-print-color-adjust: exact; }
+        .academic-table tbody tr:nth-child(odd) { background-color: #ffffff !important; -webkit-print-color-adjust: exact; }
+        
+        .faculty-input-cell { font-weight: bold; outline: none; background-color: #fffdf0; }
+        .overall-summary-row { background-color: #fee2e2 !important; color: #b91c1c !important; font-weight: bold; border-top: 2px solid #b91c1c !important; -webkit-print-color-adjust: exact; }
+
+        /* Report Container used for display */
+        #activeReport { background: white; width: 100%; max-width: 210mm; margin: 0 auto; box-sizing: border-box; border: none; min-height: 500px; }
+        .report-content-body { padding: 0 15mm 15mm 15mm; margin-top: 0; position: relative; } 
+        
+        .university-header-text { 
+            margin: 0; 
+            padding: 8mm 0 4mm 0;
+            font-size: 40px; 
+            font-weight: bold; 
+            color: #1e3a8a; 
+            text-align: center; 
+            border-bottom: 3px double #1e3a8a; 
+            text-transform: uppercase; 
+            line-height: 1;
+        }
+
+        .result-analysis-title {
+            font-size: 54px;
+            font-weight: bold; 
+            text-decoration: underline;
+            text-align: center;
+            margin: 15px 0;
+            letter-spacing: 2px;
+            color: #000;
+            text-transform: uppercase;
+        }
+
+        .mode-btn-active { background-color: #1e3a8a !important; color: white !important; border-color: #1e3a8a !important; cursor: pointer !important; }
+        .mode-btn-inactive { background-color: white !important; color: #64748b !important; border-color: #e2e8f0 !important; cursor: pointer !important; }
+
+        .app-header { background-color: #1e3a8a; color: white; padding: 1.5rem; border-radius: 0 0 1.5rem 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .rowspan-cell { font-weight: bold !important; font-size: 14px !important; text-align: center !important; vertical-align: middle !important; background-color: #ffffff !important; color: #000 !important; border: 1px solid #000 !important; display: table-cell; }
+        .course-name-cell { font-weight: bold !important; font-size: 13px !important; text-align: left !important; vertical-align: middle !important; background-color: #ffffff !important; color: #000 !important; }
+
+        [contenteditable="true"]:empty:before { content: "Enter Detail..."; color: #94a3b8; font-weight: normal; font-size: 11px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        .signature-grid {
+            margin-top: 60px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .signature-line {
+            height: 1px;
+            background: #000;
+            margin-bottom: 5px;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* PRINTING STATE OVERRIDES */
+        body.printing-state { overflow: hidden; background: white; }
+        body.printing-state .app-header, 
+        body.printing-state .lg\:col-span-4,
+        body.printing-state #emptyState { display: none !important; }
+        
+        body.printing-state .lg\:col-span-8 { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100% !important; 
+            max-width: 100% !important; 
+            margin: 0 !important; 
+            padding: 0 !important;
+            z-index: 9999;
+            background: white;
+        }
+
+        body.printing-state #reportContainer { 
+            border: none !important; 
+            box-shadow: none !important; 
+            width: 210mm !important; /* Force A4 Width */
+            margin: 0 auto !important;
+        }
+
+        body.printing-state #activeReport {
+            margin: 0 !important;
+        }
+    </style>
+</head>
+<body class="text-slate-900 md:p-4">
+    <div id="printWrapper"></div>
+    
+    <div class="max-w-7xl mx-auto main-ui no-print">
+        <header class="app-header flex flex-col items-center justify-center text-center">
+            <div class="flex items-center justify-center gap-6 mb-2">
+                <img src="https://www.gardencity.university/wp-content/uploads/2023/03/GCU-Logo-White.png" alt="GCU" class="h-[60px] w-auto">
+                <h1 class="text-4xl font-bold tracking-tight uppercase">Result Analysis Portal</h1>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-4 space-y-6">
+                <!-- Modes -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-900 uppercase">
+                        <i data-lucide="layers" class="w-5 h-5"></i> Analysis Mode
+                    </h2>
+                    <div class="flex gap-2">
+                        <button id="modeProgram" class="flex-1 py-3 px-4 rounded-xl border font-bold mode-btn-active uppercase text-xs">Programwise</button>
+                        <button id="modeSemester" class="flex-1 py-3 px-4 rounded-xl border font-bold mode-btn-inactive uppercase text-xs">Semesterwise</button>
+                    </div>
+                </div>
+
+                <!-- 1. Import -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-900 uppercase">
+                        <i data-lucide="upload" class="w-5 h-5"></i> 1. Import Data
+                    </h2>
+                    <div id="dropZone" class="border-2 border-dashed border-indigo-200 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 relative">
+                        <i data-lucide="file-spreadsheet" class="w-12 h-12 mx-auto mb-3 text-indigo-300"></i>
+                        <p id="dropZoneText" class="text-sm font-bold text-slate-700 uppercase text-center">Drop Excel Sheets Here</p>
+                        <input type="file" id="fileInput" class="absolute inset-0 opacity-0 cursor-pointer" accept=".xlsx, .xls, .csv" multiple>
+                    </div>
+                    <div id="statusMessage" class="mt-4 hidden text-sm font-bold p-3 rounded-lg text-center"></div>
+                </div>
+
+                <!-- 2. Meta -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-900 uppercase">
+                        <i data-lucide="settings" class="w-5 h-5"></i> 2. Header Customization
+                    </h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Department</label>
+                            <input list="deptOptions" id="deptSelect" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500">
+                            <datalist id="deptOptions">
+                                <option value="Engineering"><option value="Management"><option value="Commerce"><option value="Computer Science"><option value="Microbiology">
+                            </datalist>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1 text-orange-600">Program Override</label>
+                            <input type="text" id="progNameInp" placeholder="Correct Program Name..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Academic Batch</label>
+                                <input type="text" id="batchInp" placeholder="Batch..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Semester</label>
+                                <input type="text" id="semInp" placeholder="Semester..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase outline-none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Actions -->
+                <div id="actionButtons" class="hidden space-y-4">
+                    <button id="genFacultySubjectBtn" disabled class="w-full py-4 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 shadow-lg uppercase text-xs border-b-4 border-orange-700 transition-all">
+                        <i data-lucide="user-check" class="w-5 h-5 inline mr-1"></i> Faculty Subjectwise Report
+                    </button>
+                    <div class="grid grid-cols-1">
+                        <button id="downloadWordBtn" class="py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg uppercase text-xs">Download Word Report</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Panel -->
+            <div class="lg:col-span-8">
+                <div id="reportContainer" class="bg-white rounded-2xl border border-slate-200 shadow-xl min-h-[800px] overflow-hidden">
+                    <div id="emptyState" class="h-[800px] flex flex-col items-center justify-center text-slate-400 p-20 text-center uppercase font-bold">
+                        <i data-lucide="file-search" class="w-16 h-16 text-indigo-900 mb-6"></i>
+                        <p>Import Data to Preview Report</p>
+                    </div>
+                    <div id="activeReport" class="hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        Chart.register(ChartDataLabels);
+
+        let currentMode = 'program';
+        let processedData = null;
+        let chartInstances = [];
+        const COLOR_PALETTE = ['#1e3a8a', '#059669', '#b45309', '#b91c1c', '#6d28d9', '#0e7490', '#be123c', '#15803d', '#a21caf', '#7c2d12'];
+
+        const modeProgram = document.getElementById('modeProgram');
+        const modeSemester = document.getElementById('modeSemester');
+        const fileInput = document.getElementById('fileInput');
+        const deptSelect = document.getElementById('deptSelect');
+        const progNameInp = document.getElementById('progNameInp');
+        const semInp = document.getElementById('semInp');
+        const batchInp = document.getElementById('batchInp');
+        const activeReport = document.getElementById('activeReport');
+        const emptyState = document.getElementById('emptyState');
+        const actionButtons = document.getElementById('actionButtons');
+        const genFacultySubjectBtn = document.getElementById('genFacultySubjectBtn');
+
+        modeProgram.onclick = () => { currentMode = 'program'; resetUI(); };
+        modeSemester.onclick = () => { currentMode = 'semester'; resetUI(); };
+
+        function resetUI() {
+            modeProgram.className = `flex-1 py-3 px-4 rounded-xl border font-bold transition-all uppercase text-xs ${currentMode === 'program' ? 'mode-btn-active' : 'mode-btn-inactive'}`;
+            modeSemester.className = `flex-1 py-3 px-4 rounded-xl border font-bold transition-all uppercase text-xs ${currentMode === 'semester' ? 'mode-btn-active' : 'mode-btn-inactive'}`;
+            activeReport.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            actionButtons.classList.add('hidden');
+            fileInput.value = '';
+            processedData = null;
+            chartInstances.forEach(c => c.destroy());
+            chartInstances = [];
+        }
+
+        const syncHeaders = () => {
+            if (!processedData) return;
+            const deptVal = (deptSelect.value || "DEPARTMENT").toUpperCase();
+            const deptFull = deptVal.includes("DEPARTMENT") ? deptVal : `${deptVal} DEPARTMENT`;
+            document.querySelectorAll('#report-dept-header, #report-footer-dept').forEach(el => el.innerText = deptFull);
+
+            const b = (batchInp.value || "---").toUpperCase();
+            const s = (semInp.value || "---").toUpperCase();
+            const p = (progNameInp.value || "---").toUpperCase();
+
+            document.querySelectorAll('[id^="report-batch-val-"]').forEach(el => el.innerText = b);
+            document.querySelectorAll('[id^="report-sem-val-"]').forEach(el => el.innerText = s);
+            document.querySelectorAll('[id^="report-prog-val-"]').forEach(el => el.innerText = p);
+        };
+
+        [deptSelect, progNameInp, batchInp, semInp].forEach(el => el.addEventListener('input', syncHeaders));
+
+        fileInput.onchange = async (e) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            try {
+                const sheetData = [];
+                for (let file of files) {
+                    const data = await file.arrayBuffer();
+                    const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+                    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+                    sheetData.push({ rows, name: file.name });
+                }
+                processBatch(sheetData);
+            } catch (err) { alert("Error reading files: " + err.message); }
+        };
+
+        function scanSheet(rows) {
+            let codeRowIdx = -1;
+            const courseRegex = /[0-9]+[A-Z]+[0-9]+/i; 
+
+            // 1. Find Row with Course Codes (Scanning up to Row 30)
+            for (let i = 0; i < Math.min(rows.length, 30); i++) {
+                const row = rows[i] || [];
+                // More permissive regex check for codes
+                const matches = row.filter(c => c && typeof c === 'string' && courseRegex.test(c));
+                if (matches.length >= 2) { 
+                    codeRowIdx = i;
+                    break;
+                }
+            }
+            if (codeRowIdx === -1) return null;
+
+            // Metadata extraction (rows 2 and 3 usually)
+            const row3 = (rows[2] || []).filter(c => c).join(' ').trim();
+            const row4 = (rows[3] || []).filter(c => c).join(' ').trim();
+
+            const codesRow = rows[codeRowIdx] || [];
+            const nameRow = rows[codeRowIdx + 1] || [];
+            // Subheaders usually 2 rows below code
+            const subHeaderRow = rows[codeRowIdx + 2] || []; 
+
+            const subjects = [];
+            const seen = new Set();
+            
+            // 2. Map Subjects
+            codesRow.forEach((cell, idx) => {
+                if (cell && typeof cell === 'string' && courseRegex.test(cell.trim())) {
+                    const code = cell.trim();
+                    if (!seen.has(code)) {
+                        let resCol = -1;
+                        // Intelligent forward search for "Result" column
+                        for(let k=0; k<15; k++) { 
+                            const header = (subHeaderRow[idx + k] || "").toString().toUpperCase().trim();
+                            if(header.includes("RESULT") || header === "RES" || header === "GRADE") {
+                                resCol = idx + k;
+                                break;
+                            }
+                        }
+                        if(resCol === -1) resCol = idx + 3;
+
+                        subjects.push({ 
+                            code, 
+                            faculty: "", 
+                            name: (nameRow[idx] || 'Subject').toString().trim(), 
+                            resCol 
+                        });
+                        seen.add(code);
+                    }
+                }
+            });
+
+            // 3. Find Overall Result Column in Code Row (Row 5 usually)
+            let overallResCol = -1;
+            codesRow.forEach((cell, idx) => {
+                // EXCLUDE "Result : Frozen" which is metadata, find only exact "Result" header
+                if(cell && cell.toString().toUpperCase().trim() === "RESULT") overallResCol = idx;
+            });
+
+            // 4. Identify Student Rows (USN Pattern in first few cols)
+            // Look for USN pattern in columns 0, 1, or 2 to be flexible
+            const usnPattern = /[0-9]{1,}[A-Z]{2,}[0-9]{2,}/i; 
+            const studentRows = rows.slice(codeRowIdx + 3).filter(row => {
+                return (row[0] && usnPattern.test(row[0])) || (row[1] && usnPattern.test(row[1])) || (row[2] && usnPattern.test(row[2]));
+            });
+
+            const stats = subjects.map(s => {
+                let app = 0, p = 0;
+                studentRows.forEach(row => {
+                    const res = (row[s.resCol] || "").toString().toUpperCase().trim();
+                    const validPass = ["PASS", "P", "S", "O", "A+", "A", "B+", "B", "C", "D"];
+                    const validFail = ["FAIL", "F", "AB", "RA", "NE", "MAL", "F*", "RE-APPEAR"];
+                    
+                    if (validPass.includes(res) || validFail.includes(res)) { 
+                        app++; 
+                        if (validPass.includes(res)) p++; 
+                    }
+                });
+                return { ...s, app, p, pct: app > 0 ? ((p/app)*100).toFixed(2) : "0.00" };
+            });
+
+            // 5. Overall Pass Calculation
+            let ovPass = 0;
+            studentRows.forEach(row => {
+                let passed = false;
+                if(overallResCol !== -1 && row[overallResCol]) {
+                     const res = row[overallResCol].toString().toUpperCase();
+                     if(res.includes("PASS") || res.includes("FIRST") || res.includes("SECOND") || res.includes("DISTINCTION")) passed = true;
+                } else {
+                    let failFound = false;
+                    subjects.forEach(s => {
+                        const res = (row[s.resCol] || "").toString().toUpperCase().trim();
+                        if(["FAIL", "F", "AB", "RA", "F*", "NE"].includes(res)) failFound = true;
+                    });
+                    if(!failFound) passed = true;
+                }
+                if(passed) ovPass++;
+            });
+
+            return { prog: row3, batch: row4, subjects: stats, overall: { app: studentRows.length, p: ovPass, pct: studentRows.length > 0 ? ((ovPass/studentRows.length)*100).toFixed(2) : "0.00" } };
+        }
+
+        function processBatch(sheets) {
+            const reports = sheets.map(s => scanSheet(s.rows)).filter(r => r !== null);
+            if(reports.length === 0) { alert("Could not parse data. Check Excel format."); return; }
+
+            const totalApp = reports.reduce((a, b) => a + b.overall.app, 0);
+            const totalPass = reports.reduce((a, b) => a + b.overall.p, 0);
+
+            processedData = {
+                cumulative: reports.map(r => ({ name: r.prog, ...r.overall })),
+                reports: reports,
+                overall: { app: totalApp, p: totalPass, pct: totalApp > 0 ? ((totalPass/totalApp)*100).toFixed(2) : "0.00" },
+                courseAggregated: []
+            };
+
+            batchInp.value = reports[0].batch.toUpperCase();
+            semInp.value = reports[0].batch.toUpperCase();
+            progNameInp.value = (currentMode === 'program' ? reports[0].prog : "CUMULATIVE VIEW").toUpperCase();
+            
+            const globalSubjMap = {};
+            reports.forEach(r => {
+                r.subjects.forEach(s => {
+                    const key = s.name.toUpperCase();
+                    if (!globalSubjMap[key]) globalSubjMap[key] = { name: s.name, app: 0, p: 0 };
+                    globalSubjMap[key].app += s.app;
+                    globalSubjMap[key].p += s.p;
+                });
+            });
+            processedData.courseAggregated = Object.values(globalSubjMap).map(cs => ({ ...cs, pct: cs.app > 0 ? ((cs.p/cs.app)*100).toFixed(2) : "0.00" }));
+            
+            calculateFacultyComparison();
+            renderReport();
+        }
+
+        function calculateFacultyComparison() {
+            const courseMap = {}; 
+            processedData.reports.forEach((report) => {
+                report.subjects.forEach((subject) => {
+                    const facultyNameRaw = subject.faculty || ""; 
+                    if (facultyNameRaw) {
+                        const cKey = subject.name.toUpperCase();
+                        if (!courseMap[cKey]) courseMap[cKey] = { name: subject.name, faculties: {} };
+                        const names = facultyNameRaw.split(/[,&/]/).map(n => n.trim()).filter(n => n.length > 0);
+                        names.forEach(name => {
+                            const fKey = name.toUpperCase();
+                            if (!courseMap[cKey].faculties[fKey]) courseMap[cKey].faculties[fKey] = { name, app: 0, p: 0 };
+                            courseMap[cKey].faculties[fKey].app += subject.app;
+                            courseMap[cKey].faculties[fKey].p += subject.p;
+                        });
+                    }
+                });
+            });
+            processedData.comparisonList = Object.values(courseMap).map(c => ({
+                courseName: c.name,
+                faculties: Object.values(c.faculties).map(f => ({ ...f, pct: f.app > 0 ? (f.p/f.app*100).toFixed(2) : "0.00" }))
+            }));
+        }
+
+        function scrapeFacultyNames() {
+            processedData.reports.forEach((report, rIdx) => {
+                const tableRows = document.querySelectorAll(`#subj-table-${rIdx} tbody tr`);
+                tableRows.forEach((tr, sIdx) => {
+                    const facultyNameRaw = tr.querySelector('.faculty-input-cell').innerText.trim();
+                    report.subjects[sIdx].faculty = facultyNameRaw; 
+                });
+            });
+            calculateFacultyComparison();
+            
+            let allFilled = true;
+            document.querySelectorAll('.faculty-input-cell').forEach(cell => { if (!cell.innerText.trim()) allFilled = false; });
+            genFacultySubjectBtn.disabled = !allFilled;
+            if(allFilled) genFacultySubjectBtn.classList.add('bg-orange-600', 'animate-pulse');
+        }
+
+        function renderReport() {
+            if (!processedData) return;
+            emptyState.classList.add('hidden'); activeReport.classList.remove('hidden'); actionButtons.classList.remove('hidden');
+
+            const rawDept = (deptSelect.value || "DEPARTMENT").toUpperCase();
+            const deptHeader = rawDept.includes("DEPARTMENT") ? rawDept : `${rawDept} DEPARTMENT`;
+
+            let html = `
+                <div class="university-header-text">GARDEN CITY UNIVERSITY</div>
+                <div class="report-content-body">
+                    <div class="text-center">
+                        <h2 id="report-dept-header" class="text-2xl font-bold uppercase mb-1">${deptHeader}</h2>
+                        <h3 class="result-analysis-title">RESULT ANALYSIS</h3>
+                        <div class="flex justify-end w-full text-[14px] font-bold"><p>Date: ${new Date().toLocaleDateString('en-GB')}</p></div>
+                    </div>`;
+
+            if (currentMode === 'semester') {
+                html += `
+                    <div class="report-section">
+                        <h4 class="text-[15px] font-bold mb-2 underline uppercase">Cumulative Semester Overview:</h4>
+                        <table class="academic-table">
+                            <thead><tr><th style="width:50%">Program</th><th style="width:12%">Appeared</th><th style="width:12%">Passed</th><th style="width:12%">Failed</th><th style="width:14%">% Pass</th></tr></thead>
+                            <tbody>
+                            ${processedData.cumulative.map((p, idx) => `<tr><td class="font-bold editable-program" contenteditable="true" onblur="processedData.cumulative[${idx}].name=this.innerText; syncHeaders();">${p.name}</td><td class="text-center">${p.app}</td><td class="text-center">${p.p}</td><td class="text-center">${p.app-p.p}</td><td class="text-center font-bold">${p.pct}%</td></tr>`).join('')}
+                            <tr class="bg-slate-100 font-bold" style="color: #1e3a8a;"><td>TOTAL AGGREGATE</td><td class="text-center">${processedData.overall.app}</td><td class="text-center">${processedData.overall.p}</td><td class="text-center">${processedData.overall.app-processedData.overall.p}</td><td class="text-center">${processedData.overall.pct}%</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="chart-container h-[350px]"><canvas id="cumulativePie"></canvas></div>
+                    </div>`;
+            }
+
+            processedData.reports.forEach((report, rIdx) => {
+                html += `
+                    <div class="report-section">
+                        <div class="flex justify-between mb-2 text-[15px] font-bold text-indigo-900 uppercase">
+                            <p>PROGRAM: <span id="report-prog-val-${rIdx}" contenteditable="true" class="px-1 border-b border-indigo-200">${progNameInp.value || report.prog}</span></p>
+                            <p>BATCH: <span id="report-batch-val-${rIdx}" contenteditable="true" class="px-1 border-b border-indigo-200">${batchInp.value}</span></p>
+                        </div>
+                        <div class="mb-4 text-[15px] font-bold text-indigo-900 uppercase">
+                            <p>Semester: <span id="report-sem-val-${rIdx}" contenteditable="true" class="px-1 border-b border-indigo-200">${semInp.value}</span></p>
+                        </div>
+                        <h5 class="text-[14px] font-bold mb-2 underline uppercase">Subject-wise Performance:</h5>
+                        <table class="academic-table" id="subj-table-${rIdx}">
+                            <thead><tr><th style="width:15%">Code</th><th style="width:35%">Course Name</th><th style="width:20%">Faculty Name</th><th style="width:10%">App.</th><th style="width:10%">Pass</th><th style="width:10%">% Pass</th></tr></thead>
+                            <tbody>
+                            ${report.subjects.map(s => `<tr><td class="font-bold text-center">${s.code}</td><td>${s.name}</td><td class="faculty-input-cell uppercase" contenteditable="true" onblur="scrapeFacultyNames()">${s.faculty}</td><td class="text-center">${s.app}</td><td class="text-center">${s.p}</td><td class="text-center font-bold">${s.pct}%</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                        <div class="chart-container" style="height:${Math.max(300, report.subjects.length * 40)}px"><canvas id="bar-subj-${rIdx}"></canvas></div>
+                    </div>`;
+            });
+
+            html += `
+                <div id="faculty-analytics-section" class="hidden">
+                    <div class="page-break mt-12"></div>
+                    <div class="report-section mt-12">
+                        <h4 class="text-[17px] font-bold mb-8 underline uppercase tracking-[3px] text-center">Faculty - Subject Comparison Report</h4>
+                        <table class="academic-table">
+                            <thead><tr><th style="width:40%">Course Name</th><th style="width:30%">Faculty Name</th><th style="width:15%">Appeared</th><th style="width:15%">Passed</th><th style="width:15%">% Pass</th></tr></thead>
+                            <tbody id="fac-table-body"></tbody>
+                        </table>
+                        <div id="fac-chart-container" class="chart-container hidden"><canvas id="bar-fac-subj-comparison"></canvas></div>
+                    </div>
+                </div>`;
+
+            if (currentMode === 'semester') {
+                html += `
+                    <div class="page-break mt-12"></div>
+                    <div class="report-section mt-12">
+                        <h4 class="text-[17px] font-bold mb-4 underline uppercase tracking-widest text-center text-blue-900">Overall Course-wise Cumulative Analysis</h4>
+                        <table class="academic-table">
+                            <thead><tr><th style="width:60%">Subject Name</th><th style="width:13%">Total Appeared</th><th style="width:13%">Total Passed</th><th style="width:14%">Overall % Pass</th></tr></thead>
+                            <tbody>
+                                ${processedData.courseAggregated.map(cs => `<tr><td class="font-bold">${cs.name}</td><td class="text-center">${cs.app}</td><td class="text-center">${cs.p}</td><td class="text-center font-bold">${cs.pct}%</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                        <div class="chart-container" style="height: 450px;"><canvas id="bar-course-overall"></canvas></div>
+                    </div>`;
+            }
+
+            html += `
+                <div class="signature-grid">
+                    <div><div class="signature-line"></div><p>CDI</p></div>
+                    <div><div class="signature-line"></div><p>HOD</p></div>
+                    <div><div class="signature-line"></div><p id="report-footer-dept">${deptHeader}</p></div>
+                </div></div>`;
+
+            activeReport.innerHTML = html;
+            setTimeout(initBaseCharts, 100);
+        }
+
+        function initBaseCharts() {
+            chartInstances.forEach(c => c.destroy()); chartInstances = [];
+            if (currentMode === 'semester') {
+                const pie = document.getElementById('cumulativePie');
+                if (pie) chartInstances.push(new Chart(pie.getContext('2d'), { type: 'pie', data: { labels: processedData.cumulative.map(p => p.name), datasets: [{ data: processedData.cumulative.map(p => p.app), backgroundColor: COLOR_PALETTE }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { color: '#fff', font: { weight: 'bold', size: 14 } } } } }));
+                const co = document.getElementById('bar-course-overall');
+                if (co) chartInstances.push(new Chart(co.getContext('2d'), { type: 'bar', data: { labels: processedData.courseAggregated.map(cs => cs.name), datasets: [{ data: processedData.courseAggregated.map(cs => parseFloat(cs.pct)), backgroundColor: COLOR_PALETTE.slice(1) }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { max: 110 } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'right', formatter: v => v + '%' } }, barPercentage: 0.6 } }));
+            }
+            processedData.reports.forEach((report, idx) => {
+                const ctx = document.getElementById(`bar-subj-${idx}`);
+                if (ctx) chartInstances.push(new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: report.subjects.map(s => s.name), datasets: [{ data: report.subjects.map(s => parseFloat(s.pct)), backgroundColor: report.subjects.map((_, i) => COLOR_PALETTE[i % COLOR_PALETTE.length]) }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { max: 110 } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'right', formatter: v => v + '%' } }, barPercentage: 0.6 } }));
+            });
+        }
+
+        genFacultySubjectBtn.onclick = function() {
+            const section = document.getElementById('faculty-analytics-section');
+            const tbody = document.getElementById('fac-table-body');
+            const chartDiv = document.getElementById('fac-chart-container');
+            const canvas = document.getElementById('bar-fac-subj-comparison');
+            section.classList.remove('hidden');
+            let facultyRows = ""; let flatData = [];
+
+            processedData.comparisonList.forEach(group => {
+                let tApp = 0, tP = 0;
+                group.faculties.forEach((fac, fIdx) => {
+                    tApp += fac.app; tP += fac.p;
+                    // REPEATED COURSE NAME - NO ROWSPAN FOR SAFETY
+                    facultyRows += `<tr>
+                        <td class="course-name-cell">${group.courseName}</td>
+                        <td class="uppercase">${fac.name}</td><td class="text-center">${fac.app}</td><td class="text-center">${fac.p}</td><td class="text-center font-bold">${fac.pct}%</td>
+                    </tr>`;
+                    flatData.push({ label: `${fac.name} (${group.courseName})`, val: parseFloat(fac.pct), faculty: fac.name, course: group.courseName });
+                });
+                if (currentMode === 'semester') {
+                    const ovPct = tApp > 0 ? ((tP / tApp) * 100).toFixed(2) : "0.00";
+                    facultyRows += `<tr class="overall-summary-row"><td colspan="2" class="uppercase text-right pr-4">OVERALL (${group.courseName})</td><td class="text-center">${tApp}</td><td class="text-center">${tP}</td><td class="text-center">${ovPct}%</td></tr>`;
+                }
+            });
+            tbody.innerHTML = facultyRows;
+
+            if (currentMode === 'program') {
+                chartDiv.classList.remove('hidden');
+                const old = chartInstances.findIndex(c => c.canvas.id === 'bar-fac-subj-comparison');
+                if (old !== -1) { chartInstances[old].destroy(); chartInstances.splice(old, 1); }
+                chartDiv.style.height = Math.max(400, (flatData.length * 55 + 100)) + 'px';
+                chartInstances.push(new Chart(canvas.getContext('2d'), { type: 'bar', data: { labels: flatData.map(d => d.faculty), datasets: [{ data: flatData.map(d => d.val), backgroundColor: flatData.map((_, i) => COLOR_PALETTE[(i + 3) % COLOR_PALETTE.length]) }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { max: 110 } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'right', formatter: (v, ctx) => `${flatData[ctx.dataIndex].course} (${v}%)`, font: { size: 10, weight: 'bold' } } }, barPercentage: 0.7 } }));
+            } else { chartDiv.classList.add('hidden'); }
+            section.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        // Helper for Word Images
+        function canvasToImageRun(canvas, w = 550, h = 300) {
+            if(!canvas) return new window.docx.TextRun("");
+            return new window.docx.ImageRun({
+                data: Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c => c.charCodeAt(0)),
+                transformation: { width: w, height: h }
+            });
+        }
+
+        document.getElementById('downloadWordBtn').onclick = async () => {
+            scrapeFacultyNames();
+            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ImageRun, AlignmentType, BorderStyle } = window.docx;
+            const b = { style: BorderStyle.SINGLE, size: 1 }; const cs = { borders: { top: b, bottom: b, left: b, right: b } };
+            const children = [
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "GARDEN CITY UNIVERSITY", bold: true, size: 48, color: "1e3a8a" })] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: (deptSelect.value || "ACADEMIC") + " DEPARTMENT", bold: true, size: 36 })] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "RESULT ANALYSIS", bold: true, underline: {}, size: 40 })] }),
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString('en-GB')}`, size: 24 })] }),
+                new Paragraph({ text: "" })
+            ];
+
+            if (currentMode === 'semester') {
+                children.push(new Paragraph({ children: [new TextRun({ text: "CUMULATIVE OVERVIEW", bold: true, size: 28 })] }));
+                const cum = [new TableRow({ children: ["Program", "Appeared", "% Pass"].map(h => new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) }), ...processedData.cumulative.map(p => new TableRow({ children: [p.name, p.app.toString(), `${p.pct}%`].map(v => new TableCell({ ...cs, children: [new Paragraph({ text: v })] })) }))];
+                children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: cum }));
+                const cPie = chartInstances.find(c => c.canvas.id === 'cumulativePie');
+                if(cPie) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [canvasToImageRun(cPie.canvas, 400, 300)] }));
+                children.push(new Paragraph({ text: "", pageBreakBefore: true }));
+            }
+
+            processedData.reports.forEach((report, idx) => {
+                children.push(new Paragraph({ children: [new TextRun({ text: `PROGRAM: ${progNameInp.value || report.prog} | BATCH: ${batchInp.value}`, bold: true, size: 24 })] }));
+                const tableRows = [new TableRow({ children: ["Course", "Faculty", "Pass %"].map(h => new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) }), ...report.subjects.map(s => new TableRow({ children: [s.name, s.faculty, `${s.pct}%`].map(v => new TableCell({ ...cs, children: [new Paragraph({ text: v })] })) }))];
+                children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }));
+                const c = chartInstances.find(c => c.canvas.id === `bar-subj-${idx}`);
+                if (c) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [canvasToImageRun(c.canvas)] }));
+                children.push(new Paragraph({ text: "", pageBreakBefore: true }));
+            });
+
+            if (currentMode === 'semester') {
+                children.push(new Paragraph({ text: "OVERALL COURSE-WISE ANALYSIS", bold: true, size: 28 }));
+                const overallRows = [new TableRow({ children: ["Subject", "Appeared", "Pass %"].map(h => new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) }), ...processedData.courseAggregated.map(c => new TableRow({ children: [c.name, c.app.toString(), `${c.pct}%`].map(v => new TableCell({ ...cs, children: [new Paragraph({ text: v })] })) }))];
+                children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: overallRows }));
+                const co = chartInstances.find(c => c.canvas.id === 'bar-course-overall');
+                if (co) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [canvasToImageRun(co.canvas)] }));
+            }
+
+            if (processedData.comparisonList && processedData.comparisonList.length > 0) {
+                children.push(new Paragraph({ children: [new TextRun({ text: "FACULTY - SUBJECT COMPARISON", bold: true, size: 28 })] }));
+                const facTableRows = [new TableRow({ children: ["Course", "Faculty", "Appeared", "Passed", "% Pass"].map(h => new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) })];
+                processedData.comparisonList.forEach(g => {
+                    let totalApp = 0, totalPass = 0;
+                    g.faculties.forEach(f => {
+                         totalApp += f.app;
+                         totalPass += f.p;
+                        facTableRows.push(new TableRow({ children: [g.courseName, f.name, f.app.toString(), f.p.toString(), `${f.pct}%`].map(v => new TableCell({ ...cs, children: [new Paragraph({ text: v })] })) }));
+                    });
+                     if (currentMode === 'semester') {
+                         const overallPct = totalApp > 0 ? ((totalPass / totalApp) * 100).toFixed(2) : "0.00";
+                         const redText = { color: "B91C1C", bold: true };
+                         facTableRows.push(new TableRow({ children: [
+                             new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: "OVERALL", ...redText })] })] }),
+                             new TableCell({ ...cs, children: [new Paragraph({ text: "" })] }),
+                             new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: totalApp.toString(), ...redText })] })] }),
+                             new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: totalPass.toString(), ...redText })] })] }),
+                             new TableCell({ ...cs, children: [new Paragraph({ children: [new TextRun({ text: `${overallPct}%`, ...redText })] })] })
+                         ] }));
+                     }
+                });
+                children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: facTableRows }));
+                
+                if (currentMode === 'program') {
+                    const cf = chartInstances.find(c => c.canvas.id === 'bar-fac-subj-comparison');
+                    if (cf) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [canvasToImageRun(cf.canvas, 550, 400)] }));
+                }
+            }
+            
+            // Footer for Word
+            const footerTable = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE } },
+                rows: [new TableRow({
+                    children: [
+                        new TableCell({ children: [new Paragraph({ text: "CDI", alignment: AlignmentType.CENTER, bold: true })], width: { size: 33, type: WidthType.PERCENTAGE } }),
+                        new TableCell({ children: [new Paragraph({ text: "HOD", alignment: AlignmentType.CENTER, bold: true })], width: { size: 33, type: WidthType.PERCENTAGE } }),
+                        new TableCell({ children: [new Paragraph({ text: "COI", alignment: AlignmentType.CENTER, bold: true })], width: { size: 33, type: WidthType.PERCENTAGE } })
+                    ]
+                })]
+            });
+            children.push(new Paragraph({ text: "" }));
+            children.push(footerTable);
+
+            Packer.toBlob(new Document({ sections: [{ children }] })).then(blob => saveAs(blob, `GCU_Academic_Report.docx`));
+        };
+    </script>
+</body>
+</html>
